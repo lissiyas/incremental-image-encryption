@@ -1,0 +1,547 @@
+IMPORT imageio
+
+from PIL IMPORT Image,ImageOps 
+
+IMPORT numpy as np
+
+IMPORT pickle
+
+IMPORT cv2
+
+IMPORT math
+
+SET n TO 50
+
+x1=[]
+
+DEFINE FUNCTION pr_matrix(n):
+
+    
+
+    #-------------Generating Encryption Key-------------
+
+    SET Mod TO 256
+
+    SET k TO 23                                                        #Key FOR Encryption
+
+
+
+    SET d TO np.random.randint(256, size TO (int(n/2),int(n/2)))          #Arbitrary Matrix, should be saved as Key also
+
+    SET I TO np.identity(int(n/2))
+
+    SET a TO np.mod(-d,Mod)
+
+
+
+    SET b TO np.mod((k * np.mod(I - a,Mod)),Mod)
+
+    SET k TO np.mod(np.power(k,127),Mod)
+
+    SET c TO np.mod((I + a),Mod)
+
+    SET c TO np.mod(c * k, Mod)
+
+
+
+    SET A1 TO np.concatenate((a,b), axis TO 1)
+
+    SET A2 TO np.concatenate((c,d), axis TO 1)
+
+    SET A TO np.concatenate((A1,A2), axis TO 0)
+
+    SET Test TO np.mod(np.matmul(np.mod(A,Mod),np.mod(A,Mod)),Mod) 
+
+    OUTPUT(A)
+
+    OUTPUT("hello")
+
+    RETURN A
+
+    
+
+
+
+DEFINE FUNCTION XOR(x):
+
+    w=x.shape[0]
+
+    h=x.shape[1]
+
+    FOR i IN range(w):
+
+        FOR j IN range(h):
+
+            
+
+            y=x[i][j][0]
+
+            # OUTPUT(y)
+
+            y=int(y)
+
+            
+
+            y1=y^24
+
+            x[i][j][0]=y1
+
+    RETURN x   
+
+
+
+DEFINE FUNCTION permutation_single(img,S):
+
+    Mod=256
+
+    # OUTPUT('called')
+
+    img1=np.zeros([50,50,3])
+
+    FOR j IN range(int(400/n)):
+
+        FOR i IN range(int(400/n)):
+
+            SET Enc1 TO (np.matmul(S % Mod,img[i * n:(i + 1) * n, j * n:(j + 1) * n,0] % Mod)) % Mod
+
+            SET Enc1 TO np.matmul(S % Mod, np.transpose(Enc1)) % Mod
+
+            SET Enc2 TO (np.matmul(S % Mod,img[i * n:(i + 1) * n, j * n:(j + 1) * n,1] % Mod)) % Mod
+
+            SET Enc2 TO np.matmul(S % Mod, np.transpose(Enc2)) % Mod
+
+            SET Enc3 TO (np.matmul(S % Mod,img[i * n:(i + 1) * n, j * n:(j + 1) * n,2] % Mod)) % Mod
+
+            SET Enc3 TO np.matmul(S % Mod, np.transpose(Enc3)) % Mod        
+
+            
+
+            SET Enc1 TO np.resize(Enc1,(Enc1.shape[0],Enc1.shape[1],1))
+
+            SET Enc2 TO np.resize(Enc2,(Enc2.shape[0],Enc2.shape[1],1))
+
+            SET Enc3 TO np.resize(Enc3,(Enc3.shape[0],Enc3.shape[1],1))
+
+            SET img1[i * n:(i + 1) * n, j * n:(j + 1) * n] += np.concatenate((Enc1,Enc2,Enc3), axis TO 2) 
+
+    # OUTPUT(img[49][49],'####')
+
+            RETURN img1 
+
+        
+
+    
+
+global mean_prev,matrix_prev
+
+mean_prev=[]
+
+matrix_prev=[]
+
+
+
+DEFINE FUNCTION encrypt_inc(mat1,ind,mat2):
+
+    # global x,x2,index,S
+
+    # index=ind
+
+    x=mat1
+
+    x2=mat2
+
+    
+
+    
+
+    
+
+    w=x.shape[0]
+
+    h=x2.shape[1]
+
+    # Parallel(n_jobs=4)(delayed(parallel2)(i, j) FOR j IN range(h) FOR i IN range(w))
+
+
+
+    f=open('S.pkl','rb')
+
+    S=pickle.load(f)
+
+    f.close()
+
+    w=mat2.shape[0]
+
+    h=mat2.shape[1]
+
+
+
+    FOR i IN range(w):
+
+        FOR j IN range(h):
+
+            IF (i,j) IN ind:
+
+                y=mat1[i][j]
+
+                y1=permutation_single(y,S)
+
+                y1=XOR(y1)
+
+                mat2[i][j]=y1
+
+    RETURN mat2
+
+
+
+
+
+DEFINE FUNCTION compare(x1,x2):
+
+    index=[]
+
+    l1=len(x1)
+
+    FOR i IN range(l1):
+
+        FOR j IN range(l1):
+
+            IF abs(x1[i][j]-x2[i][j])>0.1:
+
+                OUTPUT(x1[i][j],x2[i][j])
+
+                index.append((i,j))
+
+    RETURN index  
+
+
+
+DEFINE FUNCTION encrypt(x):
+
+    global x1
+
+    x1=x
+
+    
+
+    f=open('S.pkl','rb')
+
+    S=pickle.load(f)
+
+    f.close()
+
+    w=x.shape[0]
+
+    h=x.shape[1]
+
+    # Parallel(n_jobs=4)(delayed(parallel1)(i, j,S) FOR j IN range(h) FOR i IN range(w))
+
+   
+
+    FOR i IN range(w):
+
+        FOR j IN range(h):
+
+            y=x[i][j]
+
+            y1=permutation_single(y,S)
+
+            y1=XOR(y1)
+
+            x[i][j]=y1
+
+    # OUTPUT(x[0][0][0])
+
+    # OUTPUT(x1[0][0][0])
+
+    # n/0
+
+    RETURN x 
+
+
+
+
+
+DEFINE FUNCTION unblockshaped(arr, h, w):
+
+    #OUTPUT(arr[0][0].shape)
+
+    IF arr.size != 0:
+
+        img=np.zeros([h,w,3])
+
+        l=0
+
+    #OUTPUT(img[0:50,0:50].shape)
+
+        FOR i IN range(0,h,50):
+
+            m=0
+
+            FOR j IN range(0,w,50):
+
+                img[i:i+50,j:j+50]=arr[l][m]
+
+                m+=1
+
+            l+=1  
+
+
+
+        RETURN img 
+
+    
+
+DEFINE FUNCTION encrypt1(img) :
+
+    global mean_prev,matrix_prev
+
+
+
+    SET chopsize TO 50
+
+
+
+    SET #img TO Image.open(infile).convert('RGB') 
+
+    SET img TO Image.fromarray(img).convert('RGB') 
+
+    img=img.resize((400,400))
+
+    
+
+    #img=ImageOps.grayscale(img)
+
+    SET width, height TO img.size
+
+
+
+    OUTPUT(width,height)
+
+
+
+    matrix_om=[]
+
+    
+
+
+
+
+
+
+
+
+
+    mean_matrix=[]
+
+    # Save Chops of original image
+
+    r=0
+
+    col=0
+
+    FOR y0 IN range(0, height, chopsize):
+
+        r+=1
+
+        col=0
+
+        r_om=[]
+
+        r_me=[]
+
+        FOR x0 IN range(0, width, chopsize):
+
+            col+=1 
+
+            SET box TO (x0, y0,
+
+                    x0+chopsize IF x0+chopsize <  width else  width,
+
+                    y0+chopsize IF y0+chopsize < height else height)
+
+            c1=img.crop(box)
+
+            
+
+            c2=np.array(c1)
+
+            c3=c2.mean().round()
+
+            
+
+            r_om.append(c2)
+
+            r_me.append(c3)
+
+            # c1.save('chunks-1/%d-%d.jpg' % (r, col))
+
+        matrix_om.append(r_om)
+
+        mean_matrix.append(r_me)
+
+    
+
+    matrix_om=np.array(matrix_om)
+
+    mean_matrix=np.array(mean_matrix)
+
+    IF len(mean_prev)!=0:
+
+        indexes=compare(mean_matrix,mean_prev)
+
+        OUTPUT(indexes)
+
+        x=encrypt_inc(matrix_om,indexes,matrix_prev)
+
+        matrix_om=x
+
+        matrix_prev=x
+
+        mean_prev=mean_matrix
+
+        OUTPUT(mean_prev)
+
+
+
+
+
+    # OUTPUT('After chunking',str(matrix_om[0][0][0][0])) 
+
+        # OUTPUT(matrix_om.shape)
+
+
+
+        img=unblockshaped(matrix_om,400,400)
+
+    # OUTPUT(type(img))
+
+        #img= cv2.cvtColor(img.astype('float32'), cv2.COLOR_RGB2BGR) 
+
+        
+
+        # cv2.imwrite('11.png',img)
+
+        RETURN img
+
+
+
+    # OUTPUT(matrix_om.shape)
+
+    # OUTPUT(mean_matrix)
+
+    x=encrypt(matrix_om)
+
+    matrix_om=x
+
+    matrix_prev=x
+
+    mean_prev=mean_matrix
+
+    OUTPUT(mean_prev)
+
+
+
+
+
+   # OUTPUT('After chunking',str(matrix_om[0][0][0][0])) 
+
+    # OUTPUT(matrix_om.shape)
+
+
+
+    img=unblockshaped(matrix_om,400,400)
+
+   # OUTPUT(type(img))
+
+    #img= cv2.cvtColor(img.astype('float32'), cv2.COLOR_RGB2BGR) 
+
+    
+
+    # cv2.imwrite('11.png',img)
+
+    RETURN img
+
+
+
+
+
+
+
+
+
+IMPORT glob
+
+IMPORT cv2 as cv
+
+
+
+IMPORT time
+
+
+
+
+
+global S
+
+
+
+S=pr_matrix(n)
+
+f=open('S.pkl','wb')
+
+pickle.dump(S,f)
+
+f.close()
+
+    
+
+OUTPUT("hello world")
+
+SET #start_time TO time.time()
+
+
+
+
+
+IMPORT os
+
+
+
+SET path TO "C:/Users/lysias/Desktop/desktop/Hill-Cipher---Image-Encryption-master/frames/*.jpg"
+
+SET #img TO cv2.imread('0.jpg') 
+
+SET # frame TO cv2.imread('0.jpg')
+
+# frame=encrypt1(frame)
+
+# cv2.write('1.jpg',frame)
+
+
+
+IF __name__=="__main__":
+
+    SET start_time TO time.time()
+
+FOR index, filename IN enumerate(glob.glob(path)):
+
+    SET frame TO cv2.imread(filename)
+
+    SET #start_time TO time.time()
+
+    frame=encrypt1(frame)
+
+SET #    blur TO 'lis'
+
+    SET basename TO os.path.splitext(os.path.basename(filename))[0]
+
+    #cv2.imwrite(f'{basename}_Gaussian{index}.png',frame)
+
+    SET par TO 'C:/Users/lysias/Desktop/desktop/Hill-Cipher---Image-Encryption-master/encrypted'
+
+    cv2.imwrite(os.path.join(par , f'{basename}image{index}.png'), frame)
+
+    t=time.time() - start_time
+
+    OUTPUT("--- %s seconds ---" % (time.time() - start_time))
